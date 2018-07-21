@@ -2,7 +2,7 @@
 
 ![Finished display](https://i.imgur.com/7l4xqym.png)
 
-![Finished display](https://i.imgur.com/N01PsK1.gifv)
+https://imgur.com/a/qAkmj0m
 
 This is an energy status display that uses the M5Stack module, which features a 320x240 color LCD and an ESP32 with Wifi support.
 The data is fetched from a Raspberry Pi or Beaglebone or any http web server for that matter. Getting the data into the relevant files is done elsewhere, this is just a display. There's one file for the core values, and then two text files for the histogram data for PV energy production and domestic power usage.
