@@ -11,7 +11,7 @@ const char* host = "";
 const int GRAPH_SIZE = 130;
 int pvGraph[GRAPH_SIZE];
 int useGraph[GRAPH_SIZE];
-int displayMode = 0;
+int displayMode = 1;
 uint32_t lastLoadTime = 0;
 uint32_t lastAnimationTime = 0;
 
@@ -121,16 +121,7 @@ void loadData()
           use = "0";
         if (battuse == "-0")
           battuse = "0";
-          
-//        display.fillScreen(GxEPD_WHITE);
-//        display.drawExampleBitmap(gImage_IMG_0001, 0, 0, 400, 300, GxEPD_WHITE);
-
-//        smallText(90, 115, battuse+" kW");
-//        smallText(245, 115, grid+" kW");
-//        bigText(245, 25, pv+" kW");
-//        bigText(245, 260, use+" kW");
-//        tinyText(350, 8, curtime);
-
+       
       battgraphmax = (int)(battery.toFloat()/100.0*75.0);
     }
     
@@ -155,15 +146,9 @@ void loadData()
         while (client.available() && x < 130) {
           float curpvf = client.readStringUntil('\n').toFloat();
           pvGraph[x] = (int)curpvf;
-//          float maxy = curpvf / 7800.0 * 60.0;
-//          for (int y = 0; y<=((int)maxy); y++) {
-//            display.drawPixel(x+10, 70-y, GxEPD_BLACK);
-//          }
           x++;
         }
     }
-//    tinyText(146, 8, "7.8");
-//    tinyText(146, 64, "0");
 
     Serial.println("PV Histogram completed!");
 
@@ -203,18 +188,7 @@ void loadData()
           maxUse = 2000;
         }
         
-/*        x=0;
-        while (x < 130) {
-          float curpvf = (float)useGraph[x];
-          float maxy = curpvf / (float)maxUse * 60.0;
-          for (int y = 0; y<=((int)maxy); y++) {
-            display.drawPixel(x+useGraphX1, useGraphY2-y, GxEPD_BLACK);
-          }
-          x++;
-        }*/
     }
-//    tinyText(useGraphX2 + 6, useGraphY1 - 2, String((float)maxUse / 1000, 1) );
-//    tinyText(useGraphX2 + 6, useGraphY2 - 6, "0");
     Serial.println("Usage Histogram completed!");
 
  
@@ -231,6 +205,9 @@ void drawHistogramUse()
   int hx = 0;
   int hy = 110;
   M5.Lcd.fillScreen(TFT_BLACK);
+  for (float a=1000.0; a<(float)maxUse; a+=1000.0) {
+    M5.Lcd.drawLine(hx+1, hy+120-(int)(a/(float)maxUse*120.0f), hx+260, hy+120-(int)(a/(float)maxUse*120.0f), TFT_DARKGREY);
+  }
   M5.Lcd.drawRect(hx, hy, 261, 121, TFT_WHITE);
   int x=1;
   int i=0;
@@ -260,6 +237,9 @@ void drawHistogramPV()
   int hx = 0;
   int hy = 110;
   M5.Lcd.fillScreen(TFT_BLACK);
+  for (float a=1000.0; a<=7000.0; a+=1000.0) {
+    M5.Lcd.drawLine(hx+1, hy+120-(int)(a/7800.0*120.0f), hx+260, hy+120-(int)(a/7800.0*120.0f), TFT_DARKGREY);
+  }
   M5.Lcd.drawRect(hx, hy, 261, 121, TFT_WHITE);
   int x=1;
   int i=0;
@@ -288,6 +268,9 @@ void drawHistogramUseSmall()
 {
   int hx = 0;
   int hy = 175;
+  for (float a=1000.0; a<(float)maxUse; a+=1000.0) {
+    M5.Lcd.drawLine(hx+1, hy+60-(int)(a/(float)maxUse*60.0f), hx+130, hy+60-(int)(a/(float)maxUse*60.0f), TFT_DARKGREY);
+  }
   M5.Lcd.drawRect(hx, hy, 131, 62, TFT_WHITE);
   int x=1;
   while (x < 130) {
@@ -302,6 +285,9 @@ void drawHistogramPVSmall()
 {
   int hx = 0;
   int hy = 0;
+  for (float a=1000.0; a<=7000.0; a+=1000.0) {
+    M5.Lcd.drawLine(hx+1, hy+60-(int)(a/7800.0*60.0f), hx+130, hy+60-(int)(a/7800.0*60.0f), TFT_DARKGREY);
+  }
   M5.Lcd.drawRect(hx, hy, 131, 62, TFT_WHITE);
   int x=1;
   while (x < 130) {
@@ -355,7 +341,7 @@ void drawOverview(bool drawHistograms)
 }
 
 int animationOffset = 0;
-int maxAnimationOffset = 180;
+int maxAnimationOffset = 140;
 void drawHorizontalPowerAnimation(int startx, int endx, int starty, int endy, int num_dots, int dir)
 {
   if (dir == 0) {
