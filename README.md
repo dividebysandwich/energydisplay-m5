@@ -1,6 +1,6 @@
 # energydisplay-m5
 
-![Finished display](https://i.imgur.com/7l4xqym.png)
+![Finished display](https://i.imgur.com/avYviSN.png)
 
 https://imgur.com/a/qAkmj0m
 
