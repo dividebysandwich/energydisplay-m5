@@ -3,17 +3,43 @@
 #include <WiFiClient.h>
 #include "bgcolor.h"
 
-const char* ssid     = "";
+const char* ssid     = ""; //Your wifi access data
 const char* password = "";
 
-const char* host = "";
+const char* host = "";  //Put the hostname for where the backend data files are accessible here
 
 const int GRAPH_SIZE = 130;
 int pvGraph[GRAPH_SIZE];
 int useGraph[GRAPH_SIZE];
+int gridGraph[GRAPH_SIZE];
+int battSocGraph[GRAPH_SIZE];
+int battUseGraph[GRAPH_SIZE];
 int displayMode = 1;
 uint32_t lastLoadTime = 0;
 uint32_t lastAnimationTime = 0;
+int value = 0;
+int useGraphX1 = 0;
+int useGraphY1 = 0;
+int useGraphX2 = useGraphX1 + 130;
+int useGraphY2 = useGraphY1 + 60;
+int maxUse = 0;
+int minUse = 0;
+int maxPV = 0;
+int minPV = 0;
+int maxGrid = 0;
+int minGrid = 0;
+int maxBattSoc= 0;
+int minBattSoc= 0;
+int maxBattUse = 0;
+int minBattUse = 0;
+int battgraphmax = 0;
+String battery = "0";
+String pv = "0";
+String use = "0";
+String grid = "0";
+String battuse = "0";
+String curtime = "0";
+String curdate = "0";
 
 float round_to_dp( float in_value, int decimal_place )
 {
@@ -58,20 +84,50 @@ void wifiReconnect() {
   }
 }
 
-int value = 0;
-int useGraphX1 = 0;
-int useGraphY1 = 0;
-int useGraphX2 = useGraphX1 + 130;
-int useGraphY2 = useGraphY1 + 60;
-int maxUse = 0;
-int battgraphmax = 0;
-String battery = "0";
-String pv = "0";
-String use = "0";
-String grid = "0";
-String battuse = "0";
-String curtime = "0";
-String curdate = "0";
+void getHistogram(WiFiClient *client, String url, String host, String keepalive, int &maxvalue, int &minvalue, int dataarray[], int forceminvalue)
+{
+      client->print(String("GET ") + url + " HTTP/1.1\r\n" +
+                 "Host: " + host + "\r\n" +
+                 "Connection: "+keepalive+"\r\n\r\n");
+    unsigned long timeout = millis();
+    while (client->available() == 0) {
+        if (millis() - timeout > 5000) {
+            Serial.println(">>> Client Timeout !");
+            client->stop();
+            return;
+        }
+    }
+
+    if (client->available()) {
+        readPastHeader(client);
+        Serial.println("Receiving Histogram "+url+"...");
+
+        
+        int x=0;
+        while (x < 130) {
+          if (client->available()) {
+            float u = client->readStringUntil('\n').toFloat();
+            dataarray[x] = (int)u;
+          } else {
+            dataarray[x] = 0;
+          }
+          if (maxvalue < dataarray[x]) {
+            maxvalue = dataarray[x];
+          }
+          if (minvalue > dataarray[x]) {
+            minvalue = dataarray[x];
+          }
+          x++;
+        }
+
+        if (maxvalue < forceminvalue) {
+          maxvalue = forceminvalue;
+        }
+        
+    }
+    Serial.println("Histogram completed!");
+
+}
 
 
 void loadData()
@@ -79,7 +135,6 @@ void loadData()
     Serial.print("connecting to ");
     Serial.println(host);
 
-    // Use WiFiClient class to create TCP connections
     WiFiClient client;
     const int httpPort = 80;
     if (!client.connect(host, httpPort)) {
@@ -124,143 +179,105 @@ void loadData()
        
       battgraphmax = (int)(battery.toFloat()/100.0*75.0);
     }
-    
-    Serial.println("Getting PV Histogram");
-    client.print(String("GET ") + "/status/lastpv.txt" + " HTTP/1.1\r\n" +
-                 "Host: " + host + "\r\n" +
-                 "Connection: Keep-Alive\r\n\r\n");
-    timeout = millis();
-    while (client.available() == 0) {
-        if (millis() - timeout > 5000) {
-            Serial.println(">>> Client Timeout !");
-            client.stop();
-            return;
-        }
-    }
 
-    if (client.available()) {
-        readPastHeader(&client);
-        Serial.println("PV Histogram received!");
-
-        int x=0;
-        while (client.available() && x < 130) {
-          float curpvf = client.readStringUntil('\n').toFloat();
-          pvGraph[x] = (int)curpvf;
-          x++;
-        }
-    }
-
-    Serial.println("PV Histogram completed!");
-
-    Serial.println("Getting Usage Histogram");
-    client.print(String("GET ") + "/status/lastuse.txt" + " HTTP/1.1\r\n" +
-                 "Host: " + host + "\r\n" +
-                 "Connection: close\r\n\r\n");
-    timeout = millis();
-    while (client.available() == 0) {
-        if (millis() - timeout > 5000) {
-            Serial.println(">>> Client Timeout !");
-            client.stop();
-            return;
-        }
-    }
-
-    if (client.available()) {
-        readPastHeader(&client);
-        Serial.println("Usage Histogram received!");
-
-        
-        int x=0;
-        while (x < 130) {
-          if (client.available()) {
-            float u = client.readStringUntil('\n').toFloat();
-            useGraph[x] = (int)u;
-          } else {
-            useGraph[x] = 0;
-          }
-          if (maxUse < useGraph[x]) {
-            maxUse = useGraph[x];
-          }
-          x++;
-        }
-
-        if (maxUse < 2000) {
-          maxUse = 2000;
-        }
-        
-    }
-    Serial.println("Usage Histogram completed!");
+    getHistogram(&client, "/status/lastpv.txt", host, "Keep-Alive", maxPV, minPV, pvGraph, 0);
+    getHistogram(&client, "/status/lastgrid.txt", host, "Keep-Alive", maxGrid, minGrid, gridGraph, 0);
+    getHistogram(&client, "/status/lastbattsoc.txt", host, "Keep-Alive", maxBattSoc, minBattSoc, battSocGraph, 100);
+    getHistogram(&client, "/status/lastbattuse.txt", host, "Keep-Alive", maxBattUse, minBattUse, battUseGraph, 0);
+    getHistogram(&client, "/status/lastuse.txt", host, "close", maxUse, minUse, useGraph, 2000);
 
  
     Serial.println();
     Serial.println("closing connection");
     client.stop();
-//    WiFi.disconnect();
-//    WiFi.mode(WIFI_OFF);
 }
 
 
-void drawHistogramUse()
+void drawHistogramBig(String title, String unit, String humanValue, int hx, int hy, int minvalue, int maxvalue, int dataarray[], uint16_t color, uint16_t alternatecolor, float divider, float gridinterval, int graphstyle)
 {
-  int hx = 0;
-  int hy = 110;
+  if (-minvalue > maxvalue) {
+    maxvalue = -minvalue;
+  }
   M5.Lcd.fillScreen(TFT_BLACK);
-  for (float a=1000.0; a<(float)maxUse; a+=1000.0) {
-    M5.Lcd.drawLine(hx+1, hy+120-(int)(a/(float)maxUse*120.0f), hx+260, hy+120-(int)(a/(float)maxUse*120.0f), TFT_DARKGREY);
+  if (minvalue == 0) {
+    for (float a=gridinterval; a<(float)maxvalue; a+=gridinterval) {
+      M5.Lcd.drawLine(hx+1, hy+120-(int)(a/(float)maxvalue*120.0f), hx+260, hy+120-(int)(a/(float)maxvalue*120.0f), TFT_DARKGREY);
+    }
+  } else {
+    for (float a=gridinterval; a<(float)maxvalue; a+=gridinterval) {
+      M5.Lcd.drawLine(hx+1, hy+60-(int)(a/(float)maxvalue*60.0f), hx+260, hy+60-(int)(a/(float)maxvalue*60.0f), TFT_DARKGREY);
+      M5.Lcd.drawLine(hx+1, hy+60+(int)(a/(float)maxvalue*60.0f), hx+260, hy+60+(int)(a/(float)maxvalue*60.0f), TFT_DARKGREY);
+    }
   }
   M5.Lcd.drawRect(hx, hy, 261, 121, TFT_WHITE);
   int x=1;
   int i=0;
-  while (i < 130) {
-    float curpvf = (float)useGraph[i];
-    float maxy = curpvf / (float)maxUse * 120.0;
-    M5.Lcd.drawLine(hx+ x, hy+120, hx+x, hy+120-(int)maxy, TFT_GREEN);
-    i++;
-    x+=2;
+  if (graphstyle == 0) {
+    x = 3;
+    i = 1;
   }
-  M5.Lcd.setTextColor(TFT_GREEN);
-  M5.Lcd.setTextSize(2);
+
+  float prevvalue = 0.0;
+  if (minvalue == 0) {
+    while (i < 130) {
+      float curpvf = (float)dataarray[i];
+      float maxy = curpvf / (float)maxvalue* 120.0;
+      if (prevvalue == 0.0) {
+        prevvalue = maxy;
+      }
+      if (graphstyle == 0) {
+        M5.Lcd.drawLine(hx+x, hy+120, hx+x, hy+120-(int)maxy, color);
+      } else {
+        M5.Lcd.drawLine(hx+x-2, hy+120-(int)prevvalue, hx+x, hy+120-(int)maxy, color);
+      }
+      prevvalue = maxy;
+      i++;
+      x+=2;
+    }
+  } else {
+    while (i < 130) {
+      float curpvf = (float)dataarray[i];
+      float maxy = curpvf / (float)maxvalue* 60.0;
+      if (prevvalue == 0.0) {
+        prevvalue = maxy;
+      }
+      uint16_t c = color;
+      if (curpvf < 0.0) {
+        c = alternatecolor;
+      }
+      if (graphstyle == 0) {
+        M5.Lcd.drawLine(hx+x, hy+60, hx+x, hy+60-(int)maxy, c);
+      } else {
+        M5.Lcd.drawLine(hx+x-2, hy+60-(int)prevvalue, hx+x, hy+60-(int)maxy, c);
+      }
+      prevvalue = maxy;
+      i++;
+      x+=2;
+    }
+  }
+  M5.Lcd.setTextColor(color);
+  M5.Lcd.setTextSize(1);
   M5.Lcd.setCursor( 270, 110);
-  M5.Lcd.print(String((float)maxUse / 1000, 1));
-  M5.Lcd.setCursor( 270, 217);
-  M5.Lcd.print("0");
+  if (divider == 1.0) {
+    M5.Lcd.print(String(maxvalue));
+  } else {
+    M5.Lcd.print(String((float)maxvalue / divider, 1));
+  }
+  M5.Lcd.setCursor( 270, 220);
+  if (minvalue == 0) {
+    M5.Lcd.print("0");
+  } else {
+    if (divider == 1.0) {
+      M5.Lcd.print("-"+String(maxvalue));
+    } else {
+      M5.Lcd.print("-"+String((float)maxvalue / divider, 1));
+    }
+  }
 
   M5.Lcd.setTextColor(TFT_WHITE);
   M5.Lcd.setTextSize(4);
-  M5.Lcd.setCursor( 20, 30);
-  M5.Lcd.print("Use: "+use+" kW");
-
-}
-
-void drawHistogramPV()
-{
-  int hx = 0;
-  int hy = 110;
-  M5.Lcd.fillScreen(TFT_BLACK);
-  for (float a=1000.0; a<=7000.0; a+=1000.0) {
-    M5.Lcd.drawLine(hx+1, hy+120-(int)(a/7800.0*120.0f), hx+260, hy+120-(int)(a/7800.0*120.0f), TFT_DARKGREY);
-  }
-  M5.Lcd.drawRect(hx, hy, 261, 121, TFT_WHITE);
-  int x=1;
-  int i=0;
-  while (i < 130) {
-    float curpvf = (float)pvGraph[i];
-    float maxy = curpvf / 7800.0 * 120.0;
-    M5.Lcd.drawLine(hx+ x, hy+120, hx+x, hy+120-(int)maxy, TFT_YELLOW);
-    i++;
-    x+=2;
-  }
-  M5.Lcd.setTextColor(TFT_YELLOW);
-  M5.Lcd.setTextSize(2);
-  M5.Lcd.setCursor( 270, 110);
-  M5.Lcd.print("7.8");
-  M5.Lcd.setCursor( 270, 217);
-  M5.Lcd.print("0");
-
-  M5.Lcd.setTextColor(TFT_WHITE);
-  M5.Lcd.setTextSize(4);
-  M5.Lcd.setCursor( 30, 30);
-  M5.Lcd.print("PV: "+pv+" kW");
+  M5.Lcd.setCursor( 10, 30);
+  M5.Lcd.print(title + ": " + humanValue + unit);
 
 }
 
@@ -443,8 +460,11 @@ void handleInput()
   switch(displayMode) {
     case 0: drawOverview(false); break;
     case 1: drawOverview(true); break;
-    case 2: drawHistogramPV(); break;
-    case 3: drawHistogramUse(); break;
+    case 2: drawHistogramBig("PV", "kW", pv, 0, 110, 0, 7800, pvGraph, TFT_YELLOW, TFT_YELLOW, 1000.0, 1000.0, 0); break;
+    case 3: drawHistogramBig("Use", "kW", use, 0, 110, 0, maxUse, useGraph, TFT_GREEN, TFT_GREEN, 1000.0, 1000.0, 0); break;
+    case 4: drawHistogramBig("Grid", "kW", grid, 0, 110, minGrid, maxGrid, gridGraph, TFT_RED, TFT_ORANGE, 1000.0, 1000.0, 0); break;
+    case 5: drawHistogramBig("Batt", "kW", battuse, 0, 110, minBattUse, maxBattUse, battUseGraph, TFT_BLUE, TFT_CYAN, 1000.0, 1000.0, 0); break;
+    case 6: drawHistogramBig("SOC", "%", battery, 0, 110, 0, 100, battSocGraph, TFT_MAGENTA, TFT_MAGENTA, 1.0, 10.0, 1); break;
   }
 }
 
@@ -475,12 +495,12 @@ void loop()
     } else if(M5.BtnA.wasPressed()) {
       displayMode--;
       if (displayMode < 0) {
-        displayMode = 3;
+        displayMode = 6;
       }
       handleInput();
     } else if(M5.BtnC.wasPressed()) {
       displayMode++;
-      if (displayMode > 3) {
+      if (displayMode > 6) {
         displayMode = 0;
       }
       handleInput();
@@ -609,7 +629,7 @@ void loop()
       lastAnimationTime = millis();
     }
     
-    if (millis() > lastLoadTime + (1000 * 60)) {
+    if (millis() > lastLoadTime + (1000 * 20)) {
       if (WiFi.status() != WL_CONNECTED) {
         wifiReconnect();
       }
