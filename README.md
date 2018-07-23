@@ -11,3 +11,16 @@ The center button on the M5Stack is used to toggle power, in case you have a bat
 
 A black/white e-ink version without animations can be found on my github as well.
 
+![Main screen with histograms](https://i.imgur.com/Wse7htN.jpg)
+
+![Main screen without histograms](https://i.imgur.com/P2BC6WJ.jpg)
+
+![PV histogram](https://i.imgur.com/QMVvZXW.png)
+
+![Power usage histogram](https://i.imgur.com/ajGNcl5.png)
+
+![Grid consumption histogram](https://i.imgur.com/EJuthH0.jpg)
+
+![Battery usage histogram](https://i.imgur.com/YvWw6y0.png)
+
+![Battery State of Charge graph](https://i.imgur.com/VlRkMRp.jpg)
