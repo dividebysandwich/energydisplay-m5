@@ -17,6 +17,7 @@ int battUseGraph[GRAPH_SIZE];
 int displayMode = 1;
 uint32_t lastLoadTime = 0;
 uint32_t lastAnimationTime = 0;
+int reloadCounter = 0;
 int value = 0;
 int useGraphX1 = 0;
 int useGraphY1 = 0;
@@ -130,7 +131,7 @@ void getHistogram(WiFiClient *client, String url, String host, String keepalive,
 }
 
 
-void loadData()
+void loadData(bool loadHistogram)
 {
     Serial.print("connecting to ");
     Serial.println(host);
@@ -143,10 +144,14 @@ void loadData()
     }
 
     Serial.println("Getting Data");
+    String keepalive = "Keep-Alive";
+    if (loadHistogram != true) {
+      keepalive = "close";
+    }
     // This will send the request to the server
     client.print(String("GET ") + "/status/soc.txt" + " HTTP/1.1\r\n" +
                  "Host: " + host + "\r\n" +
-                 "Connection: Keep-Alive\r\n\r\n");
+                 "Connection: " + keepalive + "\r\n\r\n");
     unsigned long timeout = millis();
     while (client.available() == 0) {
         if (millis() - timeout > 5000) {
@@ -180,12 +185,13 @@ void loadData()
       battgraphmax = (int)(battery.toFloat()/100.0*75.0);
     }
 
-    getHistogram(&client, "/status/lastpv.txt", host, "Keep-Alive", maxPV, minPV, pvGraph, 0);
-    getHistogram(&client, "/status/lastgrid.txt", host, "Keep-Alive", maxGrid, minGrid, gridGraph, 0);
-    getHistogram(&client, "/status/lastbattsoc.txt", host, "Keep-Alive", maxBattSoc, minBattSoc, battSocGraph, 100);
-    getHistogram(&client, "/status/lastbattuse.txt", host, "Keep-Alive", maxBattUse, minBattUse, battUseGraph, 0);
-    getHistogram(&client, "/status/lastuse.txt", host, "close", maxUse, minUse, useGraph, 2000);
-
+    if (loadHistogram == true) {
+      getHistogram(&client, "/status/lastpv.txt", host, "Keep-Alive", maxPV, minPV, pvGraph, 0);
+      getHistogram(&client, "/status/lastgrid.txt", host, "Keep-Alive", maxGrid, minGrid, gridGraph, 0);
+      getHistogram(&client, "/status/lastbattsoc.txt", host, "Keep-Alive", maxBattSoc, minBattSoc, battSocGraph, 100);
+      getHistogram(&client, "/status/lastbattuse.txt", host, "Keep-Alive", maxBattUse, minBattUse, battUseGraph, 0);
+      getHistogram(&client, "/status/lastuse.txt", host, "close", maxUse, minUse, useGraph, 2000);
+    }
  
     Serial.println();
     Serial.println("closing connection");
@@ -484,7 +490,7 @@ void setup()
       wifiReconnect();
     }
     M5.Lcd.println("Loading...");
-    loadData();
+    loadData(true);
     handleInput();
 }
 
@@ -630,10 +636,17 @@ void loop()
     }
     
     if (millis() > lastLoadTime + (1000 * 20)) {
+      reloadCounter++;
+      
       if (WiFi.status() != WL_CONNECTED) {
         wifiReconnect();
       }
-      loadData();
+      int loadHistogram = false;
+      if (reloadCounter > 3) {
+        reloadCounter = 0;
+        loadHistogram = true;
+      }
+      loadData(loadHistogram);
       handleInput();
       lastLoadTime = millis();
     }
